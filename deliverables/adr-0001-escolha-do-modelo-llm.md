@@ -1,6 +1,8 @@
 # ADR-0001 — Escolha do modelo de LLM para o pipeline RAG
 
-**Status**: Proposto
+**Status**: Aceito
+
+> Revisado em 2026-06-12 após análise crítica de objeções arquiteturais. A decisão original sobreviveu ao processo; mitigações incorporadas nos Riscos residuais. Nenhuma objeção mudou a escolha do modelo.
 
 ## Contexto
 
@@ -24,6 +26,8 @@ Adotar **Azure OpenAI Service com GPT-4o** como modelo de geração do pipeline 
 - **Custo previsível dentro da faixa aceitável**: ao volume estimado (~33M tokens de entrada + ~4M de saída/mês), o custo com GPT-4o fica em torno de R$ 900–1.200/mês (a preços de junho/2026 — validar antes do go-live). Modelos open-source evitariam esse custo, mas exigiriam infraestrutura GPU com capex equivalente ou superior.
 - **Azure AI Content Safety disponível nativamente**: o serviço já incluso no Azure AI Services permite adicionar camada de detecção de conteúdo sem engenharia adicional, reduzindo o risco de respostas fora do escopo.
 
+**Pré-condição de arquitetura**: a decisão pressupõe que o GPT-4o esteja disponível com quota suficiente na região **Brasil South**. Essa disponibilidade deve ser verificada junto ao portal Azure e ao time de suporte da Microsoft antes do início do desenvolvimento. Caso indisponível, a alternativa aceita é East US 2 com validação jurídica prévia de conformidade LGPD para dados em trânsito fora do Brasil.
+
 ## Consequências
 
 **Positivas:**
@@ -37,9 +41,18 @@ Adotar **Azure OpenAI Service com GPT-4o** como modelo de geração do pipeline 
 - Vendor lock-in: migrar para outro provedor no futuro exige reescrever integrações, renegociar contratos e revalidar conformidade.
 
 **Riscos residuais:**
+
 - GPT-4o pode ainda gerar respostas plausíveis mas incorretas quando os chunks recuperados forem de baixa qualidade (ex.: OCR ruim nos 15% de documentos escaneados). O risco não é eliminado pela escolha do modelo — é mitigado pela qualidade do pipeline de indexação e pelo prompt de grounding.
-- Preços do Azure OpenAI mudam sem aviso prévio; o custo estimado deve ser reavaliado no início de cada trimestre.
+
+- **[Mitigação obrigatória — qualidade]** O comportamento de grounding deve ser validado antes do go-live com um golden dataset de ≥50 pares pergunta/resposta baseados em documentos reais da NovaTech, incluindo casos com documentos contraditórios e chunks provenientes de OCR. A ausência desse benchmark deixa o requisito de "não alucinar" sem evidência objetiva de atendimento.
+
+- **[Mitigação obrigatória — versionamento]** A versão do modelo (ex.: `gpt-4o-2024-11-20`) deve ser pinned explicitamente no deployment do Azure OpenAI. O Azure OpenAI depreca versões com aviso de ~6 meses, e cada nova versão pode alterar comportamentos de instrução de grounding. Um processo de revalidação com o golden dataset deve ser executado antes de qualquer upgrade de versão.
+
+- Preços do Azure OpenAI mudam sem aviso prévio; o custo estimado deve ser reavaliado no início de cada trimestre. **[Mitigação adicionada]** Definir um teto orçamentário mensal aceitável para o serviço (sugestão: R$ 2.500/mês) e acionar revisão da arquitetura se o custo real superar esse valor por dois meses consecutivos, considerando a viabilidade de migração para um modelo open-source dedicado no Azure.
+
 - Quota por região pode limitar throughput em picos; provisionar quota com antecedência junto à Microsoft.
+
+- **[Mitigação obrigatória — resiliência]** Implementar circuit breaker na camada de orquestração do pipeline. Em caso de indisponibilidade ou timeout do Azure OpenAI, retornar os chunks recuperados diretamente ao usuário com mensagem explícita de degradação ("sistema operando em modo reduzido — exibindo documentos relevantes sem síntese"). Isso mantém o valor central do sistema sem exigir infraestrutura adicional.
 
 ## Alternativas consideradas
 
@@ -51,4 +64,4 @@ Adotar **Azure OpenAI Service com GPT-4o** como modelo de geração do pipeline 
 **Modelos open-source via Ollama (ex.: Llama 3, Mistral)**
 - Prós: sem custo por token; dados nunca saem da infraestrutura própria; possibilidade de fine-tuning futuro no domínio de logística.
 - Contras: exige provisionar e operar VMs com GPU no Azure (ex.: NC-series), com custo de infraestrutura mensal possivelmente superior ao custo de tokens do GPT-4o; latência de inferência tipicamente maior em hardware compartilhado; modelos open-source de 7B–13B parâmetros apresentam desempenho inferior em português técnico e em seguir instruções de grounding estritas; sem SLA gerenciado, a operação do servidor de inferência vira responsabilidade da equipe de 3 meses.
-- Por que não foi escolhida neste contexto: o projeto não tem equipe de MLOps nem orçamento de GPU no escopo. O custo total de ownership (infra + operação) supera o custo de tokens do Azure OpenAI dentro do horizonte de 12 meses, e a qualidade em português técnico é inferior sem fine-tuning — que também está fora do escopo.
+- Por que não foi escolhida neste contexto: o projeto não tem equipe de MLOps nem orçamento de GPU no escopo. O custo total de ownership (infra + operação) supera o custo de tokens do Azure OpenAI dentro do horizonte de 12 meses, e a qualidade em português técnico é inferior sem fine-tuning — que também está fora do escopo. **Nota:** se o volume mensal superar consistentemente o teto orçamentário definido nos Riscos residuais, esta alternativa deve ser reavaliada com dados reais de custo.
