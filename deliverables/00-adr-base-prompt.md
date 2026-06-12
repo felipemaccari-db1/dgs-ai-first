@@ -6,7 +6,7 @@ Definir que o modelo atua como arquiteto de software sênior ativa o registro t�
 
 ## 2. Formato estruturado como âncora (Output Anchoring)
 
-ADRs têm uma anatomia canônica (Maude/Nygard: Título → Status → Contexto → Decisão → Consequências). Fornecer o esqueleto explícito no prompt elimina variação indesejada entre as 4 saídas, mantendo consistência sem precisar corrigir depois.
+ADRs têm uma anatomia canônica (Nygard: Título → Status → Contexto → Decisão → Consequências). Fornecer o esqueleto explícito no prompt elimina variação indesejada entre as 4 saídas, mantendo consistência sem precisar corrigir depois.
 
 ## 3. Injeção de contexto rico (Context Stuffing)
 
@@ -85,7 +85,7 @@ O assistente nunca deve inventar informações.
 
 ## Decisão a documentar
 
-[PREENCHER com o texto da decisão]
+**ADR-0004 — Build vs buy para o pipeline de RAG:** Construir com LangChain/LlamaIndex + ChromaDB/FAISS (open-source, mais controle) vs usar Azure AI Search + Azure OpenAI nativo (managed, menos controle, mais integrado). Considere: custo, complexidade operacional, flexibilidade, e o fato de que a NovaTech já tem Azure.
 
 ---
 
@@ -94,7 +94,8 @@ O assistente nunca deve inventar informações.
 Gere o conteúdo completo do arquivo `deliverables/[adr-XXXX-titulo-em-kebab-case].md`
 com o seguinte formato interno:
 
----
+
+## Formato do Arquivo
 
 # ADR-XXXX — [Título curto]
 
