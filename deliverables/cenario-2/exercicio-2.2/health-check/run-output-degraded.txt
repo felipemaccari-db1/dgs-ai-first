@@ -1,0 +1,12 @@
+
+> novatech-assistant@0.1.0 mcp:health
+> tsx scripts/mcp-health-check.ts
+
+[mcp-health-check] checando 4 servidor(es) MCP declarados em .mcp/mcp.json...
+
+Resumo:
+  DEGRADED  filesystem — handshake respondeu, mas o acesso a docs/novatech via tool "list_directory" falhou: Access denied - path outside allowed directories: /home/felipemaccari/dev/db1/dgs-ai-first/deliverables/cenario-2/novatech-assistant/docs/novatech not in /home/felipemaccari/dev/db1/dgs-ai-first/deliverables/cenario-2/novatech-assistant/src, /home/felipemaccari/dev/db1/dgs-ai-first/deliverables/cenario-2/novatech-assistant/specs, /home/felipemaccari/dev/db1/dgs-ai-first/deliverables/cenario-2/novatech-assistant/skills, /home/felipemaccari/dev/db1/dgs-ai-first/deliverables/cenario-2/novatech-assistant/data/retrieval-corpus
+  UP        git
+  UP        memory
+  UP        everything
+exit code: 1
