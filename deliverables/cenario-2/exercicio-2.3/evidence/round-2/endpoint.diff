@@ -1,0 +1,78 @@
+diff --git a/src/functions/health/handler.ts b/src/functions/health/handler.ts
+index e69de29..e5599cc 100644
+--- a/src/functions/health/handler.ts
++++ b/src/functions/health/handler.ts
+@@ -0,0 +1,49 @@
++import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
++import { logger } from "../../shared/logger";
++import { DependencyUnavailableError } from "../../shared/errors";
++import { parseHealthQuery } from "./validator";
++import { ensureDependenciesHealthy } from "./checks";
++
++export async function healthHandler(
++  request: HttpRequest,
++  context: InvocationContext
++): Promise<HttpResponseInit> {
++  const parsedQuery = parseHealthQuery(request.query);
++  if (!parsedQuery.success) {
++    return { status: 400, jsonBody: { error: "invalid_input", details: parsedQuery.error.flatten() } };
++  }
++
++  const deep = parsedQuery.data.deep === "true";
++  logger.info({ invocationId: context.invocationId, deep }, "health check requested");
++
++  if (!deep) {
++    return { status: 200, jsonBody: { status: "ok" } };
++  }
++
++  try {
++    const results = await ensureDependenciesHealthy();
++    const checks = Object.fromEntries(results.map((r) => [r.name, { ok: r.ok }]));
++    return { status: 200, jsonBody: { status: "ok", checks } };
++  } catch (err) {
++    if (err instanceof DependencyUnavailableError) {
++      logger.error({ dependency: err.dependency, detail: err.detail }, "dependency check failed");
++      return {
++        status: 503,
++        jsonBody: {
++          status: "error",
++          error: "dependency_unavailable",
++          dependency: err.dependency,
++          detail: err.detail,
++        },
++      };
++    }
++    throw err; // erro não mapeado: deixa subir, não inventa um 500 silencioso
++  }
++}
++
++app.http("health", {
++  methods: ["GET"],
++  authLevel: "anonymous",
++  route: "health",
++  handler: healthHandler,
++});
+diff --git a/src/shared/errors.ts b/src/shared/errors.ts
+index e69de29..9000b2c 100644
+--- a/src/shared/errors.ts
++++ b/src/shared/errors.ts
+@@ -0,0 +1,19 @@
++// Classes de erro customizadas para falhas que ocorrem depois da validação de shape
++// (Zod). Handlers devem lançar essas classes e mapear o status HTTP por `instanceof`,
++// nunca decidir o status por string matching em `err.message`.
++//
++// Este arquivo estava vazio antes desta implementação; `DependencyUnavailableError`
++// foi adicionada aqui porque a skill `azure-functions-endpoint` a referencia como já
++// existente em `src/shared/errors.ts`, mas o arquivo não continha nenhuma classe ainda.
++
++export class DependencyUnavailableError extends Error {
++  public readonly dependency: string;
++  public readonly detail: string;
++
++  constructor(dependency: string, detail: string) {
++    super(`dependency "${dependency}" unavailable: ${detail}`);
++    this.name = "DependencyUnavailableError";
++    this.dependency = dependency;
++    this.detail = detail;
++  }
++}

@@ -1,0 +1,51 @@
+--- .specs/features/azure-functions-endpoint-skill/evidence/round-1/skill-v1-snapshot.md	2026-07-05 23:54:03.218306750 -0300
++++ skills/domain/azure-functions-endpoint.md	2026-07-05 23:41:35.374969842 -0300
+@@ -82,8 +82,48 @@
+ const deep = request.query.get("deep") === "true"; // sem schema, sem tratamento de valor inesperado
+ ```
+ 
++### 3. Erros pós-validação: lançar e mapear por `instanceof` (não apenas instanciar)
++
++> Adicionado na v2 após teste real: a v1 só tinha prosa para a Regra 6, sem exemplo de código — um agente seguiu a letra (criou a classe, a instanciou) mas nunca a lançou nem mapeou por tipo, perdendo o ponto do padrão. Ver `evidence/round-1/analise-v1.md`.
++
++**DO:**
++```typescript
++// src/functions/health/checks.ts
++import { DependencyUnavailableError } from "../../shared/errors";
++
++export async function ensureDependenciesHealthy(): Promise<void> {
++  const results = await Promise.all([checkAzureAiSearch(), checkAzureOpenAi()]);
++  const failed = results.find((r) => !r.ok);
++  if (failed) {
++    throw new DependencyUnavailableError(failed.name, failed.detail ?? "dependency check failed");
++  }
++}
++
++// src/functions/health/handler.ts
++try {
++  if (deep) await ensureDependenciesHealthy();
++} catch (err) {
++  if (err instanceof DependencyUnavailableError) {
++    logger.error({ dependency: err.dependency }, "dependency check failed");
++    return { status: 503, jsonBody: { error: "dependency_unavailable", dependency: err.dependency } };
++  }
++  throw err; // erro não mapeado: deixa subir, não inventa um 500 silencioso
++}
++```
++
++**DON'T:**
++```typescript
++// NUNCA: instanciar a classe de erro só para ler um campo dela, sem nunca lançá-la
++// nem capturá-la por instanceof — isso não é "usar uma classe de erro", é montar um
++// objeto solto com um nome chique. O handler continua decidindo o status por uma
++// variável local (`failedDependency`), exatamente o acoplamento que a classe deveria evitar.
++const error = new DependencyUnavailableError(failedDependency, "...");
++return { status: 503, jsonBody: { dependency: error.dependency } }; // `error` nunca foi lançado
++```
++
+ ## Anti-padrões comuns
+ 
++- **Instanciar uma classe de erro sem nunca lançá-la nem capturá-la por `instanceof`.** *(adicionado na v2 — achado real da rodada 1, ver `evidence/round-1/analise-v1.md`)* Criar `new DependencyUnavailableError(...)` só para ler `.dependency` de volta, enquanto a decisão de status HTTP continua vindo de uma variável local, não da classe. Isso satisfaz a letra da Regra 6 ("usar uma classe de `src/shared/errors.ts`") sem satisfazer a intenção (desacoplar o mapeamento erro→HTTP de lógica ad-hoc). O teste é simples: se a classe nunca aparece depois de um `throw` ou de um `catch (err) { if (err instanceof ...) }`, ela não está cumprindo a função de uma classe de erro.
+ - **Lógica de negócio dentro do `handler.ts`.** O handler deve orquestrar (validar → chamar serviço → mapear erro → responder); lógica de domínio pertence a `src/services/`. Motivo: mistura a camada HTTP com regra de negócio, dificultando testar a regra sem subir um request fake.
+ - **Handler que decide o status HTTP por `if (err.message.includes(...))`.** Isso acopla o contrato HTTP ao texto de uma mensagem de erro, que pode mudar sem aviso. Use classes de erro de `src/shared/errors.ts` e um `switch`/mapa por `instanceof`.
+ - **Um `pino({...})` por arquivo.** Cada instância nova perde a configuração centralizada (nível, transporte) e impede correlacionar logs do mesmo processo. Sempre importe a instância única de `src/shared/logger.ts`.

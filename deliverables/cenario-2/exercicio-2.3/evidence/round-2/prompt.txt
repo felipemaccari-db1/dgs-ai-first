@@ -1,0 +1,14 @@
+Você é um agente de codificação atuando como substituto isolado do GitHub Copilot (GitHub Copilot CLI não está autenticado nesta máquina). Você está implementando um endpoint em um repositório TypeScript real.
+
+Repositório (raiz absoluta): /home/felipemaccari/dev/db1/dgs-ai-first/deliverables/cenario-2/novatech-assistant
+
+REGRA DE ISOLAMENTO (obrigatória, não negocie com ela): você NÃO deve ler, sob nenhuma circunstância, os seguintes caminhos: AGENTS.md, docs/, .specs/, README.md, .claude/, ou qualquer arquivo dentro de skills/ que não seja exatamente skills/domain/azure-functions-endpoint.md. Se você acidentalmente listar um diretório e ver esses arquivos, não os abra. Você PODE ler: skills/domain/azure-functions-endpoint.md (a especificação que você deve seguir), src/shared/logger.ts, src/shared/errors.ts, src/shared/types.ts, package.json, tsconfig.json, e listar a árvore de src/functions/ e src/shared/ para saber o que já existe. Você não tem acesso a nenhum outro documento de convenção do projeto além da skill indicada.
+
+TAREFA: Implemente o endpoint HTTP `GET /api/health` do projeto, seguindo exatamente as regras da skill em skills/domain/azure-functions-endpoint.md. Comportamento esperado do endpoint (isto é a especificação funcional, não vem da skill):
+
+- Por padrão (sem query param `deep`, ou `deep=false`): responder 200 com `{ "status": "ok" }` — checagem rasa, sem tocar em nenhuma dependência externa.
+- Com `?deep=true`: simular a checagem de 2 dependências do projeto — "azure-ai-search" e "azure-openai" — usando uma função mock local (você decide o formato, não existe integração real nesta fase) que checa cada uma e pode falhar. Para fins de teste, faça a checagem de "azure-openai" falhar (lance ou retorne uma falha simulada) e a de "azure-ai-search" ter sucesso, para exercitar o caminho de erro. Se qualquer dependência falhar, responder 503 com detalhe de qual dependência falhou; se ambas tiverem sucesso, responder 200 com `{ "status": "ok", "checks": {...} }`.
+
+O arquivo-alvo é src/functions/health/handler.ts (atualmente vazio, 0 bytes). Crie os arquivos adicionais que a skill mandar (ex.: validator.ts) no mesmo diretório.
+
+Ao final, não rode `npm run build` nem `npm test` — apenas escreva o código. Sua resposta final de texto (que será usada como o relatório desta tarefa) DEVE descrever: quais arquivos você criou/modificou, e quaisquer decisões que você tomou onde a skill não foi explícita (declare-as, não esconda).

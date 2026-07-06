@@ -1,0 +1,15 @@
+# Comparação v1 → v2 — skill `azure-functions-endpoint`
+
+**Base:** `evidence/round-1/analise-v1.md` (único item flagueado: regra 6, parcial)
+
+| Regra flagueada na rodada 1 | O que mudou na skill (v1→v2) | Rodada 2 corrigiu? | Evidência |
+| --- | --- | --- | --- |
+| Regra 6 — classes de erro customizadas: existia só como prosa, sem exemplo de código; agente instanciou a classe sem nunca lançá-la/capturá-la por `instanceof` | Adicionado o exemplo "3. Erros pós-validação: lançar e mapear por `instanceof`" (DO/DON'T) + um anti-padrão nomeado ("Instanciar uma classe de erro sem nunca lançá-la nem capturá-la por `instanceof`") em `skills/domain/azure-functions-endpoint.md` | ✅ **Sim** | `evidence/round-2/endpoint.diff` — `handler.ts:23-38`: `try { ... } catch (err) { if (err instanceof DependencyUnavailableError) { ...; return {status:503,...}; } throw err; }` — exatamente o padrão do exemplo DO da v2, não apenas instanciando a classe. `checks.ts` também segue o padrão do exemplo (`ensureDependenciesHealthy` lança a classe em vez de retornar um booleano local). |
+
+**Regras já 100% seguidas na rodada 1 (1, 2, 3, 4, 5, 7):** não foram tocadas na v2 — nenhuma reescrita sem motivo rastreável. **Nota de proveniência:** a v1 foi editada in-place (nunca commitada como snapshot separado no momento da edição), então não existe um `git diff` real entre v1 e v2 no histórico deste sandbox. Para tornar essa afirmação verificável, reconstruí a v1 a partir do texto originalmente escrito (idêntico ao que a Edit tool substituiu na T4, confirmado porque a Edit exige match exato do texto antigo) e salvei em `evidence/round-1/skill-v1-snapshot.md`; o diff entre esse snapshot e a v2 atual está em `evidence/round-1/skill-v1-to-v2.diff` e mostra exatamente duas inserções (o novo exemplo 3 e o novo item de anti-padrão), nenhuma alteração nas seções pré-existentes — confirmado por `diff -u`, não apenas por esta afirmação.
+
+## Limitações que permanecem (declaradas, não escondidas)
+
+- O ciclo de teste usou um **sub-agente Claude isolado como substituto do GitHub Copilot** (CLI não autenticada nesta máquina) — mesma limitação já documentada nas features irmãs (`agents-md-tech-lead`, `mcp-architecture`). Não é GitHub Copilot real.
+- O prompt funcional (comportamento do endpoint `/api/health`) foi fornecido fora da skill, na tarefa — isso é esperado (a skill não define *o que* cada endpoint faz, só *como* estruturar qualquer endpoint), mas significa que esta rodada testa principalmente as regras estruturais/de estilo (1-7), não a modelagem de domínio do endpoint em si.
+- A regra 6 só foi testada no caminho de **um** tipo de erro (`DependencyUnavailableError`). O exemplo DO da v2 mostra um único `if (err instanceof ...)`; não foi exercitado um cenário com 2+ tipos de erro mapeados no mesmo handler (onde o anti-padrão "if em cadeia por string" ficaria mais tentador). Isso é uma lacuna de cobertura do teste, não da skill — fica registrado como possível rodada 3 futura, não bloqueia esta feature.

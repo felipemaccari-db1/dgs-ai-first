@@ -1,0 +1,5 @@
+
+> novatech-assistant@0.1.0 build
+> tsc -p .
+
+EXIT=0

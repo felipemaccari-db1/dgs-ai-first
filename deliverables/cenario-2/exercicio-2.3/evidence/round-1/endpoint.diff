@@ -1,0 +1,90 @@
+diff --git a/src/functions/health/handler.ts b/src/functions/health/handler.ts
+index e69de29..026fe80 100644
+--- a/src/functions/health/handler.ts
++++ b/src/functions/health/handler.ts
+@@ -0,0 +1,65 @@
++import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
++import { logger } from "../../shared/logger";
++import { DependencyUnavailableError } from "../../shared/errors";
++import { parseHealthQuery } from "./validator";
++import { dependencyChecks, DependencyCheckResult } from "./checks";
++
++export async function healthHandler(
++  request: HttpRequest,
++  context: InvocationContext
++): Promise<HttpResponseInit> {
++  const parsedQuery = parseHealthQuery(request.query);
++  if (!parsedQuery.success) {
++    return { status: 400, jsonBody: { error: "invalid_input", details: parsedQuery.error.flatten() } };
++  }
++
++  const deep = parsedQuery.data.deep === "true";
++  logger.info({ invocationId: context.invocationId, deep }, "health check requested");
++
++  if (!deep) {
++    return { status: 200, jsonBody: { status: "ok" } };
++  }
++
++  const checks: Record<string, DependencyCheckResult> = {};
++  let failedDependency: string | undefined;
++
++  for (const [name, check] of Object.entries(dependencyChecks)) {
++    try {
++      const result = await check();
++      checks[name] = result;
++      if (!result.ok && !failedDependency) {
++        failedDependency = name;
++      }
++    } catch (err) {
++      const detail = err instanceof Error ? err.message : "unknown error";
++      checks[name] = { ok: false, detail };
++      if (!failedDependency) {
++        failedDependency = name;
++      }
++    }
++  }
++
++  if (failedDependency) {
++    const error = new DependencyUnavailableError(
++      failedDependency,
++      `dependency check failed: ${failedDependency}`
++    );
++    logger.error(
++      { invocationId: context.invocationId, dependency: error.dependency, checks },
++      "deep health check failed"
++    );
++    return {
++      status: 503,
++      jsonBody: { status: "error", dependency: error.dependency, checks },
++    };
++  }
++
++  return { status: 200, jsonBody: { status: "ok", checks } };
++}
++
++app.http("health", {
++  methods: ["GET"],
++  authLevel: "anonymous",
++  route: "health",
++  handler: healthHandler,
++});
+diff --git a/src/shared/errors.ts b/src/shared/errors.ts
+index e69de29..eff1d0e 100644
+--- a/src/shared/errors.ts
++++ b/src/shared/errors.ts
+@@ -0,0 +1,15 @@
++// Classes de erro customizadas para falhas que ocorrem DEPOIS da validação de shape (Zod)
++// de um request — ex.: dependência externa indisponível, recurso não encontrado.
++// Ver skill azure-functions-endpoint (Regra 6): handlers nunca lançam `Error` genérico
++// nem devolvem 500/503 sem contexto estruturado; o log deve carregar os dados desta classe.
++
++export class DependencyUnavailableError extends Error {
++  constructor(
++    public readonly dependency: string,
++    message: string,
++    public readonly cause?: unknown
++  ) {
++    super(message);
++    this.name = "DependencyUnavailableError";
++  }
++}
