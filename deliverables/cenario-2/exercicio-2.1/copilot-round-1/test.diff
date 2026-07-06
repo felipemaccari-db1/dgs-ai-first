@@ -1,0 +1,119 @@
+diff --git a/tests/unit/functions/feedback/handler.test.ts b/tests/unit/functions/feedback/handler.test.ts
+new file mode 100644
+index 0000000..174ac0d
+--- /dev/null
++++ b/tests/unit/functions/feedback/handler.test.ts
+@@ -0,0 +1,113 @@
++// Teste unitário do endpoint POST /api/feedback (Azure Functions v4, HTTP trigger).
++// Cobre, no mínimo, o exigido pelo AGENTS.md > Coding Standards > Testes:
++// caminho feliz (input válido → 200) e caminho de erro de validação (input
++// inválido → 400 com detalhes do Zod).
++//
++// `HttpRequest` e `InvocationContext` de "@azure/functions" expõem
++// construtores públicos "for testing purposes only" — são o jeito suportado
++// pelo SDK de montar request/context sem subir um runtime real de Functions.
++
++import { describe, expect, it } from "vitest";
++import { HttpRequest, InvocationContext } from "@azure/functions";
++import { feedbackHandler } from "../../../../src/functions/feedback/handler";
++
++type JsonBody = Record<string, unknown>;
++
++function buildRequest(rawBody: string): HttpRequest {
++  return new HttpRequest({
++    method: "POST",
++    url: "http://localhost/api/feedback",
++    headers: { "content-type": "application/json" },
++    body: { string: rawBody },
++  });
++}
++
++function buildJsonRequest(body: unknown): HttpRequest {
++  return buildRequest(JSON.stringify(body));
++}
++
++function buildContext(): InvocationContext {
++  return new InvocationContext({
++    invocationId: "test-invocation-id",
++    functionName: "feedback",
++  });
++}
++
++describe("feedbackHandler (POST /api/feedback)", () => {
++  it("caminho feliz: input válido retorna 200 com confirmação do feedback", async () => {
++    const request = buildJsonRequest({
++      ticketId: "TCK-1234",
++      rating: 5,
++      comment: "Atendimento resolveu o problema rapidamente.",
++    });
++
++    const response = await feedbackHandler(request, buildContext());
++
++    expect(response.status).toBe(200);
++    expect(response.jsonBody).toMatchObject({
++      status: "received",
++      ticketId: "TCK-1234",
++      rating: 5,
++    });
++
++    const body = response.jsonBody as JsonBody;
++    expect(typeof body.receivedAt).toBe("string");
++    // receivedAt deve ser um timestamp ISO 8601 válido.
++    expect(new Date(body.receivedAt as string).toISOString()).toBe(body.receivedAt);
++  });
++
++  it("caminho feliz: comentário é opcional", async () => {
++    const request = buildJsonRequest({ ticketId: "TCK-5678", rating: 3 });
++
++    const response = await feedbackHandler(request, buildContext());
++
++    expect(response.status).toBe(200);
++    expect(response.jsonBody).toMatchObject({
++      status: "received",
++      ticketId: "TCK-5678",
++      rating: 3,
++    });
++  });
++
++  it("caminho de erro: rating fora do intervalo permitido (1-5) retorna 400 com detalhes de validação", async () => {
++    const request = buildJsonRequest({ ticketId: "TCK-9999", rating: 7 });
++
++    const response = await feedbackHandler(request, buildContext());
++
++    expect(response.status).toBe(400);
++    const body = response.jsonBody as JsonBody;
++    expect(body.error).toBe("invalid_input");
++
++    const details = body.details as { fieldErrors: Record<string, string[]> };
++    expect(details.fieldErrors.rating).toBeDefined();
++    expect(details.fieldErrors.rating!.length).toBeGreaterThan(0);
++  });
++
++  it("caminho de erro: ticketId ausente retorna 400 com detalhes de validação", async () => {
++    const request = buildJsonRequest({ rating: 2 });
++
++    const response = await feedbackHandler(request, buildContext());
++
++    expect(response.status).toBe(400);
++    const body = response.jsonBody as JsonBody;
++    expect(body.error).toBe("invalid_input");
++
++    const details = body.details as { fieldErrors: Record<string, string[]> };
++    expect(details.fieldErrors.ticketId).toBeDefined();
++    expect(details.fieldErrors.ticketId!.length).toBeGreaterThan(0);
++  });
++
++  it("caminho de erro: body que não é JSON válido retorna 400 com formErrors", async () => {
++    const request = buildRequest("{ isto não é um json válido");
++
++    const response = await feedbackHandler(request, buildContext());
++
++    expect(response.status).toBe(400);
++    const body = response.jsonBody as JsonBody;
++    expect(body.error).toBe("invalid_input");
++
++    const details = body.details as { formErrors: string[]; fieldErrors: Record<string, string[]> };
++    expect(details.formErrors.length).toBeGreaterThan(0);
++    expect(details.fieldErrors).toEqual({});
++  });
++});

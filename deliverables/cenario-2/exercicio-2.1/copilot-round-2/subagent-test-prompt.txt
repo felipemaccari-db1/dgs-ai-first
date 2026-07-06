@@ -1,0 +1,17 @@
+Você está trabalhando no repositório local em /home/felipemaccari/dev/db1/dgs-ai-first/deliverables/cenario-2/novatech-assistant (projeto TypeScript/Azure Functions; node_modules já instalado, `npm run build` passa limpo).
+
+Antes de escrever qualquer código, leia por completo o arquivo AGENTS.md na raiz deste repositório e siga todas as regras dele que se aplicarem ao que você vai implementar.
+
+Sua tarefa: escrever o teste automatizado (Vitest) do endpoint HTTP Azure Function já implementado em src/functions/feedback/handler.ts (e src/functions/feedback/validator.ts, e src/shared/logger.ts). O arquivo de teste ainda não existe.
+
+Para entender as convenções de teste do repositório, veja o vitest.config.ts na raiz e a pasta tests/ (tests/unit, tests/integration, tests/e2e, tests/fixtures — hoje vazias, sem nenhum teste existente para copiar estilo). Decida você mesmo o estilo, seguindo o AGENTS.md e as convenções TypeScript do projeto (veja tsconfig.json).
+
+O teste deve cobrir pelo menos: (a) o caminho feliz (input válido, resposta 200 com confirmação), (b) um caminho de erro de validação (input inválido, resposta 400 com detalhes).
+
+Restrição importante: NÃO leia nada dentro de .specs/, docs/, ou .claude/ deste repositório, nem specs/ (sem ponto) ou skills/ — só AGENTS.md, o código-fonte em src/, os arquivos de config na raiz, e a pasta tests/.
+
+Depois de escrever o teste, rode `npm test` de verdade e reporte a saída real (passou/falhou, quantos testes).
+
+Ao terminar, seu relatório final (texto da resposta) deve conter, nesta ordem: (1) confirmação de que leu o AGENTS.md e o que dele é relevante para escrever este teste; (2) o conteúdo final do arquivo de teste; (3) a saída real de `npm test` (colada, não resumida); (4) qualquer regra do AGENTS.md que você decidiu não seguir e por quê (se houver).
+
+--- Diferença única em relação a evidence/round-1/subagent-test-prompt.txt: a frase "Não existe nenhum teste no repositório ainda, então não há exemplo de teste já escrito para copiar o estilo" foi reformulada para "hoje vazias, sem nenhum teste existente para copiar estilo" (mesmo conteúdo factual — na rodada 2 o teste da rodada 1 já tinha sido removido do working tree antes desta chamada, então a frase continua verdadeira). Nenhuma restrição ou regra mudou. Registrado por transparência (mesmo achado do Verifier sobre ausência de registro de prompt na rodada 2). ---

@@ -1,0 +1,17 @@
+Você está trabalhando no repositório local em /home/felipemaccari/dev/db1/dgs-ai-first/deliverables/cenario-2/novatech-assistant (projeto TypeScript/Azure Functions, scaffold inicial, sem node_modules instalado ainda).
+
+Antes de escrever qualquer código, leia por completo o arquivo AGENTS.md na raiz deste repositório e siga todas as regras dele que se aplicarem ao que você vai implementar. É o documento de convenções do projeto.
+
+Sua tarefa: implementar o endpoint HTTP Azure Function que está em stub (arquivos vazios) em:
+- src/functions/feedback/handler.ts
+- src/functions/feedback/validator.ts
+
+Requisito funcional (é só isso que se sabe sobre o que o endpoint deve fazer): ele recebe via HTTP POST feedback sobre um chamado de suporte, com um ticketId, uma nota (rating) de 1 a 5, e um comentário opcional em texto. Deve validar o input e devolver uma confirmação em JSON em caso de sucesso, ou um erro 400 com detalhes da validação em caso de input inválido.
+
+Para entender as convenções de código já usadas no repositório (além do que estiver no AGENTS.md), você pode olhar livremente qualquer arquivo dentro de src/ e tests/, e o package.json/tsconfig.json/vitest.config.ts na raiz. Adicione ao package.json qualquer dependência npm que você realmente precisar para implementar o endpoint de acordo com as convenções do AGENTS.md.
+
+Restrição importante: NÃO leia nada dentro de .specs/, docs/, ou .claude/ deste repositório — esses diretórios contêm material de planejamento e critérios de avaliação que não deveriam influenciar sua implementação (o teste é justamente ver se você segue o AGENTS.md sem ajuda externa).
+
+Não crie o teste automatizado agora — isso é uma tarefa separada. Não rode `npm install` nem `npm run build` a menos que precise disso para escrever código correto (por exemplo, para conferir tipos de uma dependência) — se rodar, registre o resultado no seu relatório final.
+
+Ao terminar, seu relatório final (texto da resposta) deve conter, nesta ordem: (1) uma confirmação de que você leu o AGENTS.md e um resumo de 3-5 frases do que ele pede que seja relevante para este endpoint; (2) o conteúdo final de handler.ts e validator.ts; (3) a lista de dependências que você adicionou ao package.json, se alguma; (4) qualquer regra do AGENTS.md que você decidiu não seguir e por quê (se houver).

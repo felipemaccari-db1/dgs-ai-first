@@ -1,0 +1,106 @@
+diff --git a/tests/unit/feedback-handler.test.ts b/tests/unit/feedback-handler.test.ts
+new file mode 100644
+index 0000000..40e4119
+--- /dev/null
++++ b/tests/unit/feedback-handler.test.ts
+@@ -0,0 +1,100 @@
++// Teste unitário do endpoint HTTP de feedback (POST /feedback).
++//
++// Ver AGENTS.md > Coding Standards > "Testes": todo endpoint HTTP novo DEVE ter teste
++// unitário cobrindo pelo menos o caminho feliz e um caminho de erro de validação, em
++// tests/unit/. Cobre também o caso de corpo com JSON malformado, que o handler trata
++// antes mesmo de chegar ao schema Zod (ver handler.ts).
++//
++// HttpRequest e InvocationContext são construídos via os construtores "for testing
++// purposes only" expostos pelo próprio pacote @azure/functions — não há necessidade de
++// mock/cast manual do request/context.
++
++import { describe, expect, it } from "vitest";
++import { HttpRequest, InvocationContext } from "@azure/functions";
++import { feedbackHandler } from "../../src/functions/feedback/handler";
++
++function buildRequest(rawBody: string): HttpRequest {
++  return new HttpRequest({
++    method: "POST",
++    url: "http://localhost:7071/api/feedback",
++    body: { string: rawBody },
++  });
++}
++
++function buildContext(): InvocationContext {
++  return new InvocationContext({
++    invocationId: "test-invocation-id",
++    functionName: "feedback",
++  });
++}
++
++describe("feedbackHandler", () => {
++  it("retorna 200 e confirma o recebimento do feedback para um input válido", async () => {
++    const request = buildRequest(
++      JSON.stringify({ ticketId: "TCK-123", rating: 5, comment: "Resolveu rápido." })
++    );
++
++    const response = await feedbackHandler(request, buildContext());
++
++    expect(response.status).toBe(200);
++    expect(response.jsonBody).toMatchObject({
++      status: "received",
++      ticketId: "TCK-123",
++      rating: 5,
++    });
++    // receivedAt DEVE ser um timestamp ISO 8601 válido gerado pelo handler.
++    const jsonBody = response.jsonBody as { receivedAt: string };
++    expect(new Date(jsonBody.receivedAt).toISOString()).toBe(jsonBody.receivedAt);
++  });
++
++  it("retorna 200 sem comment quando o campo opcional não é enviado", async () => {
++    const request = buildRequest(JSON.stringify({ ticketId: "TCK-456", rating: 1 }));
++
++    const response = await feedbackHandler(request, buildContext());
++
++    expect(response.status).toBe(200);
++    expect(response.jsonBody).toMatchObject({ status: "received", ticketId: "TCK-456", rating: 1 });
++  });
++
++  it("retorna 400 com detalhes de validação quando o rating está fora do intervalo permitido", async () => {
++    const request = buildRequest(JSON.stringify({ ticketId: "TCK-789", rating: 10 }));
++
++    const response = await feedbackHandler(request, buildContext());
++
++    expect(response.status).toBe(400);
++    expect(response.jsonBody).toMatchObject({ error: "invalid_input" });
++    const jsonBody = response.jsonBody as {
++      details: { fieldErrors: Record<string, string[] | undefined> };
++    };
++    expect(jsonBody.details.fieldErrors.rating).toBeDefined();
++    expect(jsonBody.details.fieldErrors.rating?.length).toBeGreaterThan(0);
++  });
++
++  it("retorna 400 com detalhes de validação quando ticketId está ausente", async () => {
++    const request = buildRequest(JSON.stringify({ rating: 3 }));
++
++    const response = await feedbackHandler(request, buildContext());
++
++    expect(response.status).toBe(400);
++    const jsonBody = response.jsonBody as {
++      error: string;
++      details: { fieldErrors: Record<string, string[] | undefined> };
++    };
++    expect(jsonBody.error).toBe("invalid_input");
++    expect(jsonBody.details.fieldErrors.ticketId).toBeDefined();
++  });
++
++  it("retorna 400 quando o corpo da requisição não é um JSON válido", async () => {
++    const request = buildRequest("isto não é JSON");
++
++    const response = await feedbackHandler(request, buildContext());
++
++    expect(response.status).toBe(400);
++    expect(response.jsonBody).toMatchObject({
++      error: "invalid_input",
++      details: { fieldErrors: {} },
++    });
++    const jsonBody = response.jsonBody as { details: { formErrors: string[] } };
++    expect(jsonBody.details.formErrors.length).toBeGreaterThan(0);
++  });
++});

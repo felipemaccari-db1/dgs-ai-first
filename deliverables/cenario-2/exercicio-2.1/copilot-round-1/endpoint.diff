@@ -1,0 +1,147 @@
+diff --git a/package.json b/package.json
+index 26dc929..b1b0abe 100644
+--- a/package.json
++++ b/package.json
+@@ -8,9 +8,13 @@
+     "lint": "eslint .",
+     "build": "tsc -p ."
+   },
++  "dependencies": {
++    "@azure/functions": "^4.5.0",
++    "pino": "^9.3.0",
++    "zod": "^3.23.0"
++  },
+   "devDependencies": {
+     "typescript": "^5.5.0",
+-    "vitest": "^2.0.0",
+-    "zod": "^3.23.0"
++    "vitest": "^2.0.0"
+   }
+ }
+diff --git a/src/functions/feedback/handler.ts b/src/functions/feedback/handler.ts
+index e69de29..a45882d 100644
+--- a/src/functions/feedback/handler.ts
++++ b/src/functions/feedback/handler.ts
+@@ -0,0 +1,81 @@
++// HTTP trigger do endpoint de feedback (Azure Functions v4, modelo programático).
++// POST /api/feedback — recebe feedback de um atendente sobre um chamado de
++// suporte (ticketId, nota de 1 a 5, comentário opcional) e devolve uma
++// confirmação em JSON, ou 400 com detalhes de validação em caso de input inválido.
++//
++// Padrões aplicados (ver AGENTS.md > Coding Standards):
++// - Validação de input via Zod (validator.ts) — nenhum campo do body é lido
++//   antes de passar pelo schema.
++// - Logging via pino — nunca console.log/console.error em código de src/.
++// - Logs de erro incluem contexto estruturado (ticketId, errorCode), nunca
++//   só a mensagem de erro solta.
++
++import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } from "@azure/functions";
++import pino from "pino";
++import { validateFeedbackInput } from "./validator";
++
++const logger = pino({ name: "feedback-handler" });
++
++export async function feedbackHandler(
++  request: HttpRequest,
++  context: InvocationContext
++): Promise<HttpResponseInit> {
++  let body: unknown;
++
++  try {
++    body = await request.json();
++  } catch {
++    logger.warn(
++      { errorCode: "invalid_json", invocationId: context.invocationId },
++      "feedback request body is not valid JSON"
++    );
++    return {
++      status: 400,
++      jsonBody: {
++        error: "invalid_input",
++        details: {
++          formErrors: ["body da requisição deve ser um JSON válido"],
++          fieldErrors: {},
++        },
++      },
++    };
++  }
++
++  const result = validateFeedbackInput(body);
++
++  if (!result.success) {
++    const details = result.error.flatten();
++    logger.warn(
++      { errorCode: "validation_failed", details, invocationId: context.invocationId },
++      "feedback request failed validation"
++    );
++    return {
++      status: 400,
++      jsonBody: { error: "invalid_input", details },
++    };
++  }
++
++  const { ticketId, rating, comment } = result.data;
++
++  logger.info(
++    { ticketId, rating, hasComment: comment !== undefined, invocationId: context.invocationId },
++    "feedback received"
++  );
++
++  return {
++    status: 200,
++    jsonBody: {
++      status: "received",
++      ticketId,
++      rating,
++      receivedAt: new Date().toISOString(),
++    },
++  };
++}
++
++app.http("feedback", {
++  methods: ["POST"],
++  authLevel: "anonymous",
++  route: "feedback",
++  handler: feedbackHandler,
++});
+diff --git a/src/functions/feedback/validator.ts b/src/functions/feedback/validator.ts
+index e69de29..eb841cc 100644
+--- a/src/functions/feedback/validator.ts
++++ b/src/functions/feedback/validator.ts
+@@ -0,0 +1,36 @@
++// Validação de input do endpoint POST /feedback.
++// Ver AGENTS.md > Coding Standards: toda Azure Function HTTP DEVE validar seu input com Zod
++// antes de o handler tocar em qualquer campo do body.
++
++import { z } from "zod";
++
++/**
++ * Feedback sobre um chamado de suporte: ticketId obrigatório, nota (rating)
++ * de 1 a 5, comentário em texto opcional.
++ */
++export const FeedbackInputSchema = z.object({
++  ticketId: z.string().min(1, "ticketId é obrigatório"),
++  rating: z.number().int().min(1).max(5),
++  comment: z.string().max(2_000).optional(),
++});
++
++export type FeedbackInput = z.infer<typeof FeedbackInputSchema>;
++
++export type FeedbackValidationResult =
++  | { success: true; data: FeedbackInput }
++  | { success: false; error: z.ZodError<FeedbackInput> };
++
++/**
++ * Valida um payload desconhecido (ex.: body de uma requisição HTTP já
++ * parseado como JSON) contra o schema de feedback. Nunca lança — o chamador
++ * decide o que fazer com o resultado (ex.: montar uma resposta 400).
++ */
++export function validateFeedbackInput(payload: unknown): FeedbackValidationResult {
++  const parsed = FeedbackInputSchema.safeParse(payload);
++
++  if (!parsed.success) {
++    return { success: false, error: parsed.error };
++  }
++
++  return { success: true, data: parsed.data };
++}

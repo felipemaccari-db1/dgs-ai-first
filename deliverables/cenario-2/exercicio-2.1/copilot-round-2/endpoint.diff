@@ -1,0 +1,147 @@
+diff --git a/src/functions/feedback/handler.ts b/src/functions/feedback/handler.ts
+index a45882d..7bb987a 100644
+--- a/src/functions/feedback/handler.ts
++++ b/src/functions/feedback/handler.ts
+@@ -1,27 +1,26 @@
+-// HTTP trigger do endpoint de feedback (Azure Functions v4, modelo programático).
+-// POST /api/feedback — recebe feedback de um atendente sobre um chamado de
+-// suporte (ticketId, nota de 1 a 5, comentário opcional) e devolve uma
+-// confirmação em JSON, ou 400 com detalhes de validação em caso de input inválido.
++// HTTP trigger do endpoint de feedback (POST /feedback).
+ //
+-// Padrões aplicados (ver AGENTS.md > Coding Standards):
+-// - Validação de input via Zod (validator.ts) — nenhum campo do body é lido
+-//   antes de passar pelo schema.
+-// - Logging via pino — nunca console.log/console.error em código de src/.
+-// - Logs de erro incluem contexto estruturado (ticketId, errorCode), nunca
+-//   só a mensagem de erro solta.
++// Recebe a avaliação de um atendente sobre a resposta dada a um chamado de suporte:
++// ticketId, rating (1-5) e um comentário opcional. Valida o input com Zod
++// (ver validator.ts) e devolve uma confirmação em JSON em caso de sucesso, ou 400 com
++// os detalhes da validação em caso de input inválido.
++//
++// Convenções seguidas (ver AGENTS.md):
++// - Azure Functions v4, modelo de registro programático (app.http), nunca function.json (v3).
++// - Nenhum acesso a request.body/request.json() sem passar pelo schema Zod primeiro.
++// - Logging exclusivamente via src/shared/logger.ts (nenhum pino(...) local), com contexto
++//   estruturado (ticketId/errorCode) em todo log de erro.
++// - Erro de validação de shape (Zod) responde 400 direto, sem classe de erro customizada.
+ 
+-import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } from "@azure/functions";
+-import pino from "pino";
++import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
++import { logger } from "../../shared/logger";
+ import { validateFeedbackInput } from "./validator";
+ 
+-const logger = pino({ name: "feedback-handler" });
+-
+ export async function feedbackHandler(
+   request: HttpRequest,
+   context: InvocationContext
+ ): Promise<HttpResponseInit> {
+   let body: unknown;
+-
+   try {
+     body = await request.json();
+   } catch {
+@@ -34,28 +33,26 @@ export async function feedbackHandler(
+       jsonBody: {
+         error: "invalid_input",
+         details: {
+-          formErrors: ["body da requisição deve ser um JSON válido"],
++          formErrors: ["O corpo da requisição deve ser um JSON válido."],
+           fieldErrors: {},
+         },
+       },
+     };
+   }
+ 
+-  const result = validateFeedbackInput(body);
+-
+-  if (!result.success) {
+-    const details = result.error.flatten();
++  const parsed = validateFeedbackInput(body);
++  if (!parsed.success) {
+     logger.warn(
+-      { errorCode: "validation_failed", details, invocationId: context.invocationId },
+-      "feedback request failed validation"
++      { errorCode: "validation_failed", invocationId: context.invocationId },
++      "feedback input failed validation"
+     );
+     return {
+       status: 400,
+-      jsonBody: { error: "invalid_input", details },
++      jsonBody: { error: "invalid_input", details: parsed.error.flatten() },
+     };
+   }
+ 
+-  const { ticketId, rating, comment } = result.data;
++  const { ticketId, rating, comment } = parsed.data;
+ 
+   logger.info(
+     { ticketId, rating, hasComment: comment !== undefined, invocationId: context.invocationId },
+diff --git a/src/functions/feedback/validator.ts b/src/functions/feedback/validator.ts
+index eb841cc..05aaa78 100644
+--- a/src/functions/feedback/validator.ts
++++ b/src/functions/feedback/validator.ts
+@@ -1,15 +1,15 @@
+-// Validação de input do endpoint POST /feedback.
+-// Ver AGENTS.md > Coding Standards: toda Azure Function HTTP DEVE validar seu input com Zod
+-// antes de o handler tocar em qualquer campo do body.
++// Validação do input do endpoint de feedback (POST /feedback).
++// Ver AGENTS.md > Coding Standards > "Validação de input/output": toda Azure Function HTTP
++// DEVE validar seu input com Zod antes de qualquer handler tocar em request.body/request.json().
+ 
+ import { z } from "zod";
+ 
+-/**
+- * Feedback sobre um chamado de suporte: ticketId obrigatório, nota (rating)
+- * de 1 a 5, comentário em texto opcional.
+- */
++// Schema conforme o exemplo "DO" do AGENTS.md (Coding Standards > Validação de input/output):
++// ticketId identifica o chamado de suporte avaliado; rating é a nota de 1 a 5;
++// comment é um texto livre opcional (limitado para não estourar o orçamento de contexto
++// caso o feedback venha a alimentar o pipeline de RAG no futuro — ver ADR-0002).
+ export const FeedbackInputSchema = z.object({
+-  ticketId: z.string().min(1, "ticketId é obrigatório"),
++  ticketId: z.string().min(1),
+   rating: z.number().int().min(1).max(5),
+   comment: z.string().max(2_000).optional(),
+ });
+@@ -21,16 +21,13 @@ export type FeedbackValidationResult =
+   | { success: false; error: z.ZodError<FeedbackInput> };
+ 
+ /**
+- * Valida um payload desconhecido (ex.: body de uma requisição HTTP já
+- * parseado como JSON) contra o schema de feedback. Nunca lança — o chamador
+- * decide o que fazer com o resultado (ex.: montar uma resposta 400).
++ * Valida o corpo bruto (unknown) de uma requisição de feedback contra o FeedbackInputSchema.
++ * Nunca lança — o chamador decide como responder em caso de falha de validação.
+  */
+-export function validateFeedbackInput(payload: unknown): FeedbackValidationResult {
+-  const parsed = FeedbackInputSchema.safeParse(payload);
+-
++export function validateFeedbackInput(body: unknown): FeedbackValidationResult {
++  const parsed = FeedbackInputSchema.safeParse(body);
+   if (!parsed.success) {
+     return { success: false, error: parsed.error };
+   }
+-
+   return { success: true, data: parsed.data };
+ }
+diff --git a/src/shared/logger.ts b/src/shared/logger.ts
+index e69de29..0d2528e 100644
+--- a/src/shared/logger.ts
++++ b/src/shared/logger.ts
+@@ -0,0 +1,11 @@
++// Instância única de pino para todo o projeto.
++// Ver AGENTS.md > Coding Standards > Logging:
++// "src/shared/logger.ts DEVE exportar uma única factory/instância de pino para todo o projeto —
++// nenhum outro arquivo em src/ pode chamar pino(...) diretamente."
++//
++// Todo handler/serviço que precisa logar DEVE importar `logger` deste arquivo,
++// nunca instanciar seu próprio logger local.
++
++import pino from "pino";
++
++export const logger = pino({ name: "novatech-assistant" });

@@ -1,0 +1,19 @@
+Você está trabalhando no repositório local em /home/felipemaccari/dev/db1/dgs-ai-first/deliverables/cenario-2/novatech-assistant (um projeto TypeScript/Azure Functions, node_modules já instalado).
+
+Antes de escrever qualquer código, leia por completo o arquivo AGENTS.md na raiz deste repositório e siga todas as regras dele que se aplicarem ao que você vai implementar. É o documento de convenções do projeto.
+
+Sua tarefa: implementar o endpoint HTTP Azure Function que está em stub (arquivos vazios) em:
+- src/functions/feedback/handler.ts
+- src/functions/feedback/validator.ts
+
+Requisito funcional (é só isso que se sabe sobre o que o endpoint deve fazer): ele recebe via HTTP POST feedback sobre um chamado de suporte, com um ticketId, uma nota (rating) de 1 a 5, e um comentário opcional em texto. Deve validar o input e devolver uma confirmação em JSON em caso de sucesso, ou um erro 400 com detalhes da validação em caso de input inválido.
+
+Para entender as convenções de código já usadas no repositório (além do que estiver no AGENTS.md), você pode olhar livremente qualquer arquivo dentro de src/ e tests/, e o package.json/tsconfig.json/vitest.config.ts na raiz. O package.json já tem @azure/functions, pino e zod como dependências — confirme se precisa de mais alguma.
+
+Restrição importante: NÃO leia nada dentro de .specs/, docs/, ou .claude/ deste repositório — esses diretórios contêm material de planejamento e critérios de avaliação que não deveriam influenciar sua implementação (o teste é justamente ver se você segue o AGENTS.md sem ajuda externa). Também não leia specs/ (sem ponto) nem skills/.
+
+Não crie o teste automatizado agora — isso é uma tarefa separada.
+
+Ao terminar, seu relatório final (texto da resposta) deve conter, nesta ordem: (1) uma confirmação de que você leu o AGENTS.md e um resumo de 3-5 frases do que ele pede que seja relevante para este endpoint (preste atenção especial em qualquer regra sobre logging e sobre tratamento de erros — cite o texto exato dessas regras); (2) o conteúdo final de handler.ts e validator.ts; (3) qualquer regra do AGENTS.md que você decidiu não seguir e por quê (se houver).
+
+--- IDÊNTICO AO PROMPT DA RODADA 1 (evidence/round-1/subagent-endpoint-prompt.txt), exceto pela frase "O package.json já tem @azure/functions, pino e zod como dependências — confirme se precisa de mais alguma", que substitui "Adicione ao package.json qualquer dependência npm que você realmente precisar" da rodada 1 — porque, na rodada 2, essas dependências já existiam no package.json (adicionadas na rodada 1) e não fazia sentido pedir para "adicionar" o que já estava lá. Essa é a única diferença funcional entre os dois prompts; nenhuma regra ou restrição mudou. Registrado aqui por transparência (achado do Verifier em `validation.md`: rodada 2 não tinha prompt salvo para comparação). ---

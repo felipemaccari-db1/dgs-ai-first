@@ -1,0 +1,23 @@
+
+> novatech-assistant@0.1.0 test
+> vitest run
+
+
+ RUN  v2.1.9 /home/felipemaccari/dev/db1/dgs-ai-first/deliverables/cenario-2/novatech-assistant
+
+stderr | tests/unit/feedback-handler.test.ts
+WARNING: Failed to detect the Azure Functions runtime. Switching "@azure/functions" package to test mode - not all features are supported.
+WARNING: Skipping call to register function "feedback" because the "@azure/functions" package is in test mode.
+
+{"level":30,"time":1783299076136,"pid":36301,"hostname":"DB1G4319","name":"novatech-assistant","ticketId":"TCK-123","rating":5,"hasComment":true,"invocationId":"test-invocation-id","msg":"feedback received"}
+{"level":30,"time":1783299076139,"pid":36301,"hostname":"DB1G4319","name":"novatech-assistant","ticketId":"TCK-456","rating":1,"hasComment":false,"invocationId":"test-invocation-id","msg":"feedback received"}
+{"level":40,"time":1783299076140,"pid":36301,"hostname":"DB1G4319","name":"novatech-assistant","errorCode":"validation_failed","invocationId":"test-invocation-id","msg":"feedback input failed validation"}
+{"level":40,"time":1783299076141,"pid":36301,"hostname":"DB1G4319","name":"novatech-assistant","errorCode":"validation_failed","invocationId":"test-invocation-id","msg":"feedback input failed validation"}
+{"level":40,"time":1783299076142,"pid":36301,"hostname":"DB1G4319","name":"novatech-assistant","errorCode":"invalid_json","invocationId":"test-invocation-id","msg":"feedback request body is not valid JSON"}
+ ✓ tests/unit/feedback-handler.test.ts (5 tests) 14ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  21:51:22
+   Duration  555ms (transform 64ms, setup 0ms, collect 102ms, tests 14ms, environment 0ms, prepare 97ms)
+
